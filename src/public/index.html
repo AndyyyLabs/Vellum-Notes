@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Vellum - Your Notes</title>
+    <link rel="stylesheet" href="./css/styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" rel="stylesheet">
+</head>
+
+<body class="app-body">
+    <!-- Three Column Layout -->
+    <div class="three-column-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <!-- App Logo and Name Header -->
+            <div class="app-header">
+                <div class="app-name">
+                    <h1>Vellum Notes</h1>
+                </div>
+            </div>
+
+            <!-- User Profile Section -->
+            <div class="user-profile-section">
+                <div class="user-profile">
+                    <div class="user-avatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div class="user-info">
+                        <span class="username">User</span>
+                        <span class="user-email">user@example.com</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Navigation List -->
+            <div class="navigation-list">
+                <div class="section-header">
+                    <div class="section-title">Quick Links</div>
+                </div>
+                <div class="nav-item active" data-filter="all">
+                    <div class="nav-icon-and-text">
+                        <i class="fa-regular fa-note-sticky"></i>
+                        <span>All Notes</span>
+                    </div>
+                    <span class="nav-count" id="allNotesCount">0</span>
+                </div>
+            </div>
+
+            <!-- Folders Section -->
+            <div class="folders-section">
+                <div class="section-header">
+                    <div class="section-title">Folders</div>
+                    <button id="newFolderBtn" class="add-folder-button-small" title="Add New Folder">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+                <div id="foldersContainer" class="folders-list">
+                    <!-- Folders will be populated here -->
+                </div>
+            </div>
+
+            <!-- Settings Section -->
+            <div class="settings-section">
+                <div class="section-header">
+                    <div class="section-title">Settings</div>
+                </div>
+                <div class="settings-item" id="themeToggleBtn" title="Toggle Theme">
+                    <div class="settings-icon-and-text">
+                        <i class="fas fa-moon"></i>
+                        <span>Dark Mode</span>
+                    </div>
+                    <div class="settings-toggle">
+                        <div class="toggle-switch"></div>
+                    </div>
+                </div>
+                <div class="settings-item" id="logoutBtn" title="Logout">
+                    <div class="settings-icon-and-text">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span>Logout</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Notes List -->
+        <section class="notes-list">
+            <!-- Notes List Header -->
+            <div class="notes-list-header">
+                <div class="mobile-nav mobile-only">
+                    <button id="mobileMenuBtn" class="mobile-menu-btn" title="Open Menu">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                </div>
+                <div class="search-container">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" id="searchInput" placeholder="Search" class="search-input">
+                </div>
+                <button id="newNoteBtn" class="add-note-button-upgraded" title="Create New Note">
+                    <i class="fas fa-plus"></i>
+                </button>
+            </div>
+
+            <!-- Notes Container -->
+            <div class="notes-container">
+                <div id="notesContainer" class="notes-grid">
+                    <!-- Notes will be populated here -->
+                </div>
+
+                <div id="emptyState" class="empty-state" style="display: none;">
+                    <div class="empty-state-content">
+                        <i class="fas fa-scroll empty-icon"></i>
+                        <h3>No Notes Yet</h3>
+                        <p>Create your first note to get started!</p>
+                        <div class="empty-state-actions">
+                            <button id="createTemplateBtn" class="btn btn-secondary">
+                                <i class="fas fa-magic"></i>
+                                Create Template
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Content Area -->
+        <section class="content-area">
+            <!-- Content Header -->
+            <div class="content-header">
+                <div class="mobile-nav mobile-only">
+                    <button id="mobileBackBtn" class="mobile-back-btn" title="Back to Notes">
+                        <i class="fas fa-arrow-left"></i>
+                    </button>
+                </div>
+                <div class="content-actions">
+                    <button id="editNoteBtn" class="btn btn-primary" style="display: none;">
+                        <i class="fas fa-edit"></i>
+                        Edit
+                    </button>
+                    <button id="folderBtn" class="btn btn-icon" style="display: none;" title="Select Folder">
+                        <i class="fas fa-folder"></i>
+                    </button>
+                    <button id="deleteNoteBtn" class="btn btn-icon btn-danger" style="display: none;">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Content Body -->
+            <div class="content-body">
+                <div id="contentPlaceholder" class="content-placeholder">
+                    <i class="fas fa-scroll placeholder-icon"></i>
+                    <h2>Select a Note</h2>
+                    <p>Choose a note from the list to view its content</p>
+                </div>
+
+                <div id="noteContent" class="note-content" style="display: none;">
+                    <div class="note-content-header">
+                        <h1 id="noteTitle" class="note-title"></h1>
+                        <div class="note-meta">
+                            <div class="note-date-container">
+                                <span class="note-date" id="noteDate"></span>
+                            </div>
+                            <div id="noteFolder" class="note-folder-container" style="display: none;"></div>
+                        </div>
+                    </div>
+                    <div class="note-content-body">
+                        <div id="notePreview" class="note-preview"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Mobile Sidebar Overlay -->
+    <div id="sidebarOverlay" class="sidebar-overlay"></div>
+
+    <!-- Folder Modal -->
+    <div id="folderModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="folderModalTitle">Create New Folder</h3>
+                <button id="closeFolderModal" class="modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="folderForm">
+                    <div class="form-group">
+                        <label for="folderName">Folder Name</label>
+                        <input type="text" id="folderName" name="name" required placeholder="Enter folder name">
+                    </div>
+                    <div class="form-group">
+                        <label for="folderDescription">Description (Optional)</label>
+                        <textarea id="folderDescription" name="description" placeholder="Enter folder description"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="folderColor">Color</label>
+                        <input type="color" id="folderColor" name="color" value="#5a7c5e">
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" id="cancelFolderBtn" class="btn btn-secondary">Cancel</button>
+                        <button type="submit" id="saveFolderBtn" class="btn btn-primary">Save Folder</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Note Folder Selection Modal -->
+    <div id="noteFolderModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Select Folder</h3>
+                <button id="closeNoteFolderModal" class="modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="noteFolderSelect">Folder:</label>
+                    <select id="noteFolderSelect" class="folder-select">
+                        <option value="">No Folder</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="button" id="closeNoteFolderModalBtn" class="btn btn-secondary">Cancel</button>
+                    <button type="button" id="saveNoteFolderBtn" class="btn btn-primary">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="./js/template.js"></script>
+    <script src="./js/auth.js"></script>
+    <script src="./js/app.js"></script>
+</body>
+
+</html>
