@@ -16,7 +16,6 @@ class NoteApp {
         };
         this.isEditing = false;
         this.isMobile = window.innerWidth <= 768;
-        this.isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
         this.init();
     }
 
@@ -28,25 +27,13 @@ class NoteApp {
         this.loadFolders();
         this.loadNotes();
         this.updateCounts();
-
-        // Set up periodic token expiry check
-        this.setupTokenExpiryCheck();
-    }
-
-    setupTokenExpiryCheck() {
-        // Check token expiry every 30 seconds
-        setInterval(() => {
-            if (!Auth.isAuthenticated()) {
-                window.location.href = '/login';
-            }
-        }, 30000);
     }
 
     async createTemplateNote() {
         const success = await NoteTemplate.createTemplateNote(this.baseURL, Auth.getToken(), {
             isFavorite: true
         });
-
+        
         if (success) {
             this.loadNotes();
             this.updateCounts();
@@ -63,12 +50,11 @@ class NoteApp {
         const savedTheme = localStorage.getItem('theme') || 'light';
         document.documentElement.setAttribute('data-theme', savedTheme);
 
-        // Update theme toggle text based on current theme
         const themeToggleBtn = document.getElementById('themeToggleBtn');
         if (themeToggleBtn) {
-            const textSpan = themeToggleBtn.querySelector('span');
-            if (textSpan) {
-                textSpan.textContent = savedTheme === 'dark' ? 'Light Mode' : 'Dark Mode';
+            const icon = themeToggleBtn.querySelector('i');
+            if (icon) {
+                icon.className = savedTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
             }
         }
     }
@@ -76,7 +62,7 @@ class NoteApp {
     async initUserInterface() {
         // Set user name in the interface
         let user = Auth.getUser();
-
+        
         // If user data is not in localStorage, fetch it from the API
         if (!user) {
             try {
@@ -85,7 +71,7 @@ class NoteApp {
                         'Authorization': `Bearer ${Auth.getToken()}`
                     }
                 });
-
+                
                 if (response.ok) {
                     const data = await response.json();
                     user = data.user;
@@ -95,28 +81,18 @@ class NoteApp {
                 console.error('Error fetching user data:', error);
             }
         }
-
-        if (user) {
-            // Update username
-            if (user.name) {
-                const usernameElement = document.querySelector('.username');
-                if (usernameElement) {
-                    usernameElement.textContent = user.name;
-                }
-
-                // Update user avatar with first letter of name
-                const userAvatar = document.querySelector('.user-avatar');
-                if (userAvatar) {
-                    userAvatar.innerHTML = user.name.charAt(0).toUpperCase();
-                }
+        
+        if (user && user.name) {
+            const usernameElement = document.querySelector('.username');
+            if (usernameElement) {
+                usernameElement.textContent = user.name;
             }
 
-            // Update user email
-            if (user.email) {
-                const userEmailElement = document.querySelector('.user-email');
-                if (userEmailElement) {
-                    userEmailElement.textContent = user.email;
-                }
+            // Update user avatar with first letter of name
+            const userAvatar = document.querySelector('.user-avatar');
+            if (userAvatar) {
+                userAvatar.textContent = user.name.charAt(0).toUpperCase();
+                userAvatar.innerHTML = user.name.charAt(0).toUpperCase();
             }
         }
     }
@@ -145,6 +121,11 @@ class NoteApp {
             newNoteBtn.addEventListener('click', () => this.createNewNote());
         }
 
+        const createFirstNoteBtn = document.getElementById('createFirstNoteBtn');
+        if (createFirstNoteBtn) {
+            createFirstNoteBtn.addEventListener('click', () => this.createNewNote());
+        }
+
         const createTemplateBtn = document.getElementById('createTemplateBtn');
         if (createTemplateBtn) {
             createTemplateBtn.addEventListener('click', () => this.createTemplateNote());
@@ -163,12 +144,12 @@ class NoteApp {
         }
 
         // Content area actions
-        const editNoteBtn = document.getElementById('editNoteBtn');
+        const fullScreenEditBtn = document.getElementById('fullScreenEditBtn');
         const folderBtn = document.getElementById('folderBtn');
         const deleteNoteBtn = document.getElementById('deleteNoteBtn');
 
-        if (editNoteBtn) {
-            editNoteBtn.addEventListener('click', () => this.toggleEditMode());
+        if (fullScreenEditBtn) {
+            fullScreenEditBtn.addEventListener('click', () => this.openFullScreenEditor());
         }
         if (folderBtn) {
             folderBtn.addEventListener('click', () => this.openNoteFolderModal());
@@ -264,19 +245,42 @@ class NoteApp {
             this.handleResize();
         });
 
+        // Add swipe gesture support for mobile
+        if (this.isMobile) {
+            this.setupSwipeGestures();
+        }
 
-
-        // Prevent zoom on double tap (iOS)
-        let lastTouchEnd = 0;
-        document.addEventListener('touchend', (event) => {
-            const now = (new Date()).getTime();
-            if (now - lastTouchEnd <= 300) {
-                event.preventDefault();
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            // Ctrl+N for new note
+            if (e.ctrlKey && e.key === 'n') {
+                e.preventDefault();
+                this.createNewNote();
             }
-            lastTouchEnd = now;
-        }, false);
 
+            // Ctrl+S for save (when in full screen editor)
+            if (e.ctrlKey && e.key === 's' && this.isEditing) {
+                e.preventDefault();
+                // Save is handled by the full screen editor
+                if (window.markdownEditor && window.markdownEditor.saveNote) {
+                    window.markdownEditor.saveNote();
+                }
+            }
 
+            // Escape to close full screen editor
+            if (e.key === 'Escape' && this.isEditing) {
+                e.preventDefault();
+                if (window.markdownEditor && window.markdownEditor.closeEditor) {
+                    window.markdownEditor.closeEditor();
+                }
+            }
+
+            // Escape to close mobile sidebar
+            if (e.key === 'Escape' && this.isMobile) {
+                this.closeMobileSidebar();
+                this.closeMobileNote();
+            }
+        });
     }
 
     handleQuickLinkFilter(filter) {
@@ -354,7 +358,7 @@ class NoteApp {
         if (this.folders.length === 0) {
             container.innerHTML = `
                 <div class="empty-folders" style="text-align: center; padding: 20px; color: var(--text-secondary); font-size: 0.9rem;">
-                    <i class="fa-regular fa-folder"</i>
+                    <i class="fas fa-folder-open" style="font-size: 2rem; margin-bottom: 10px; opacity: 0.5;"></i>
                     <div>No folders yet</div>
                 </div>`;
             return;
@@ -374,7 +378,7 @@ class NoteApp {
         return `
             <div class="folder-item ${isActive ? 'active' : ''}" data-folder-id="${folder._id}">
                 <span class="folder-label">
-                    <i class="fa-regular fa-folder" style="color: ${folder.color}"></i>
+                    <i class="fas fa-folder" style="color: ${folder.color}"></i>
                     ${folder.name}
                 </span>
                 <span class="folder-count" id="folder-count-${folder._id}">${noteCount}</span>
@@ -614,7 +618,7 @@ class NoteApp {
 
     createNoteCard(note) {
         const date = new Date(note.updatedAt).toLocaleDateString();
-        const content = this.stripMarkdown(note.content).substring(0, 220);
+        const content = this.stripMarkdown(note.content).substring(0, 150);
         const isSelected = this.currentNote && this.currentNote._id === note._id;
 
         // Add folder badge if note has a folder
@@ -625,10 +629,8 @@ class NoteApp {
             </span>
         ` : '';
 
-        const folderColorStyle = note.folder ? ` style="--folder-color: ${note.folder.color};"` : '';
-
         return `
-            <div class="note-card ${isSelected ? 'selected' : ''}" data-note-id="${note._id}"${folderColorStyle}>
+            <div class="note-card ${isSelected ? 'selected' : ''}" data-note-id="${note._id}">
                 <div class="note-card-header">
                     <div>
                         <h3 class="note-title">
@@ -648,7 +650,7 @@ class NoteApp {
                         </button>
                     </div>
                 </div>
-                <div class="note-content note-content--faded">${this.escapeHtml(content)}${content.length >= 220 ? '...' : ''}</div>
+                <div class="note-content">${this.escapeHtml(content)}${content.length >= 150 ? '...' : ''}</div>
             </div>
         `;
     }
@@ -699,15 +701,21 @@ class NoteApp {
         // Update note content
         document.getElementById('noteTitle').textContent = this.currentNote.title;
         document.getElementById('noteDate').textContent = `Last edited: ${new Date(this.currentNote.updatedAt).toLocaleDateString()}`;
-
+        
         // Update folder display
         this.displayNoteFolder();
 
         // Render note content
         const notePreview = document.getElementById('notePreview');
         if (this.currentNote.content) {
-            // Display rich text content directly (it's already HTML)
-            notePreview.innerHTML = this.currentNote.content;
+            // Use marked.js to convert markdown to HTML
+            const htmlContent = marked.parse(this.currentNote.content);
+            notePreview.innerHTML = htmlContent;
+
+            // Apply syntax highlighting
+            notePreview.querySelectorAll('pre code').forEach((block) => {
+                hljs.highlightElement(block);
+            });
         } else {
             notePreview.innerHTML = '<p class="text-muted">No content</p>';
         }
@@ -737,15 +745,15 @@ class NoteApp {
     }
 
     updateContentActions() {
-        const editNoteBtn = document.getElementById('editNoteBtn');
+        const fullScreenEditBtn = document.getElementById('fullScreenEditBtn');
         const folderBtn = document.getElementById('folderBtn');
         const deleteNoteBtn = document.getElementById('deleteNoteBtn');
 
-        // Show edit button when creating new note or when note exists
-        if (this.currentNote || this.isEditing) {
-            editNoteBtn.style.display = 'inline-flex';
+        // Show full-screen edit button when note exists
+        if (this.currentNote) {
+            fullScreenEditBtn.style.display = 'inline-flex';
         } else {
-            editNoteBtn.style.display = 'none';
+            fullScreenEditBtn.style.display = 'none';
         }
 
         // Show folder button when editing or when note exists
@@ -764,29 +772,17 @@ class NoteApp {
     }
 
     createNewNote() {
-        // Create a temporary note object for new notes
-        const tempNote = {
-            _id: 'temp-' + Date.now(),
-            title: 'Untitled Note',
-            content: '',
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            folder: null,
-            isTemplate: false
-        };
-
-        // Add to notes array at the beginning
-        this.notes.unshift(tempNote);
-        this.currentNote = tempNote;
-        this.currentNoteFolder = null;
+        this.currentNote = null;
+        this.currentNoteFolder = null; // Reset folder state
         this.isEditing = true;
 
-        // Update UI immediately
-        this.renderNotes();
-        this.updateCounts();
-
-        // Use the legacy editor for new notes
-        this.setupLegacyNewNote();
+        // Open the full-screen CodeMirror editor for new note
+        if (window.markdownEditor) {
+            window.markdownEditor.openEditor(null);
+        } else {
+            // Fallback to old editor
+            this.setupLegacyNewNote();
+        }
     }
 
     setupLegacyNewNote() {
@@ -801,7 +797,7 @@ class NoteApp {
         document.getElementById('noteTitle').textContent = '';
         document.getElementById('noteDate').textContent = `Last edited: ${new Date().toLocaleDateString()}`;
         document.getElementById('notePreview').innerHTML = '<p class="text-muted">Start writing your note...</p>';
-
+        
         // Clear folder display
         const noteFolderContainer = document.getElementById('noteFolder');
         if (noteFolderContainer) {
@@ -822,18 +818,18 @@ class NoteApp {
     }
 
     setupEditMode() {
-        // Use the legacy editor
-        this.setupLegacyEditMode();
+        // Open the full-screen CodeMirror editor
+        if (window.markdownEditor) {
+            window.markdownEditor.openEditor(this.currentNote);
+        } else {
+            // Fallback to old editor if CodeMirror is not available
+            this.setupLegacyEditMode();
+        }
     }
 
     setupLegacyEditMode() {
-        const editNoteBtn = document.getElementById('editNoteBtn');
         const noteTitle = document.getElementById('noteTitle');
         const notePreview = document.getElementById('notePreview');
-
-        editNoteBtn.innerHTML = '<i class="fas fa-save"></i> Save';
-        editNoteBtn.classList.add('btn-primary');
-        editNoteBtn.classList.remove('btn-secondary');
 
         // Make title editable
         const titleInput = document.createElement('input');
@@ -846,105 +842,30 @@ class NoteApp {
         noteTitle.innerHTML = '';
         noteTitle.appendChild(titleInput);
 
-        // Build rich text editor
+        // Create textarea for editing
+        const textarea = document.createElement('textarea');
+        textarea.id = 'noteContentTextarea';
+        textarea.className = 'note-content-textarea';
+        textarea.placeholder = 'Write your note in markdown...';
+        textarea.value = this.currentNote ? this.currentNote.content : '';
+
         notePreview.innerHTML = '';
+        notePreview.appendChild(textarea);
 
-        const editorContainer = document.createElement('div');
-        editorContainer.className = 'rich-text-editor';
-
-        const toolbar = document.createElement('div');
-        toolbar.className = 'rich-text-toolbar';
-        toolbar.innerHTML = `
-            <div class="toolbar-group">
-                <button type="button" class="toolbar-btn" data-cmd="formatBlock" data-value="H1" title="Heading 1"><i class="fas fa-heading"></i>1</button>
-                <button type="button" class="toolbar-btn" data-cmd="formatBlock" data-value="H2" title="Heading 2"><i class="fas fa-heading"></i>2</button>
-                <button type="button" class="toolbar-btn" data-cmd="formatBlock" data-value="P" title="Paragraph"><i class="fas fa-paragraph"></i></button>
-            </div>
-            <div class="toolbar-group">
-                <button type="button" class="toolbar-btn" data-cmd="bold" title="Bold (Ctrl+B)"><i class="fas fa-bold"></i></button>
-                <button type="button" class="toolbar-btn" data-cmd="italic" title="Italic (Ctrl+I)"><i class="fas fa-italic"></i></button>
-                <button type="button" class="toolbar-btn" data-cmd="underline" title="Underline (Ctrl+U)"><i class="fas fa-underline"></i></button>
-            </div>
-            <div class="toolbar-group">
-                <button type="button" class="toolbar-btn" data-cmd="insertUnorderedList" title="Bulleted List"><i class="fas fa-list-ul"></i></button>
-                <button type="button" class="toolbar-btn" data-cmd="insertOrderedList" title="Numbered List"><i class="fas fa-list-ol"></i></button>
-                <button type="button" class="toolbar-btn" data-cmd="outdent" title="Outdent"><i class="fas fa-outdent"></i></button>
-                <button type="button" class="toolbar-btn" data-cmd="indent" title="Indent"><i class="fas fa-indent"></i></button>
-            </div>
-            <div class="toolbar-group">
-                <button type="button" class="toolbar-btn" data-cmd="formatBlock" data-value="BLOCKQUOTE" title="Quote"><i class="fas fa-quote-right"></i></button>
-                <button type="button" class="toolbar-btn" data-cmd="insertHorizontalRule" title="Divider"><i class="fas fa-minus"></i></button>
-                <button type="button" class="toolbar-btn" data-cmd="removeFormat" title="Clear Formatting"><i class="fas fa-eraser"></i></button>
-            </div>
-            <div class="toolbar-group">
-                <button type="button" class="toolbar-btn" data-cmd="undo" title="Undo (Ctrl+Z)"><i class="fas fa-rotate-left"></i></button>
-                <button type="button" class="toolbar-btn" data-cmd="redo" title="Redo (Ctrl+Y)"><i class="fas fa-rotate-right"></i></button>
-            </div>
-        `;
-
-        const editor = document.createElement('div');
-        editor.id = 'noteContentEditor';
-        editor.className = 'note-content-editor';
-        editor.contentEditable = 'true';
-        editor.setAttribute('role', 'textbox');
-        editor.setAttribute('aria-multiline', 'true');
-        editor.innerHTML = this.currentNote ? (this.currentNote.content || '') : '';
-
-        editorContainer.appendChild(toolbar);
-        editorContainer.appendChild(editor);
-        notePreview.appendChild(editorContainer);
-
-        // Toolbar events
-        toolbar.querySelectorAll('.toolbar-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const cmd = btn.getAttribute('data-cmd');
-                const val = btn.getAttribute('data-value');
-                if (cmd === 'formatBlock') {
-                    document.execCommand('formatBlock', false, val);
-                } else {
-                    document.execCommand(cmd, false, null);
-                }
-                editor.focus();
-            });
-        });
-
-        // Keyboard shortcuts
-        editor.addEventListener('keydown', (e) => {
-            if ((e.ctrlKey || e.metaKey) && !e.shiftKey) {
-                if (e.key.toLowerCase() === 'b') { e.preventDefault(); document.execCommand('bold'); }
-                if (e.key.toLowerCase() === 'i') { e.preventDefault(); document.execCommand('italic'); }
-                if (e.key.toLowerCase() === 'u') { e.preventDefault(); document.execCommand('underline'); }
-                if (e.key.toLowerCase() === 's') { e.preventDefault(); this.saveNote(); }
-            }
-        });
-
-        // Mark as editing and focus on title input
-        this.isEditing = true;
+        // Focus on title input first
         setTimeout(() => {
             titleInput.focus();
             titleInput.select();
         }, 100);
     }
 
-    toggleEditMode() {
-        // Allow toggling edit mode if we have a current note OR if we're already editing (for new notes)
-        if (!this.currentNote && !this.isEditing) return;
-
-        if (this.isEditing) {
-            // If already editing, save the note
-            this.saveNote();
-        } else {
-            // Enter edit mode
-            this.isEditing = true;
-            this.setupLegacyEditMode();
-        }
-    }
+    // toggleEditMode removed - editing is now only done through full screen editor
 
     async saveNote() {
         const titleInput = document.getElementById('noteTitleInput');
         const title = titleInput ? titleInput.value.trim() : document.getElementById('noteTitle').textContent;
-        const editor = document.getElementById('noteContentEditor');
-        const content = editor ? editor.innerHTML.trim() : '';
+        const textarea = document.getElementById('noteContentTextarea');
+        const content = textarea ? textarea.value.trim() : '';
         const selectedFolder = this.currentNoteFolder || null;
 
         if (!title) {
@@ -957,21 +878,21 @@ class NoteApp {
             return;
         }
 
+        let processedContent = content;
+
         try {
             const noteData = {
                 title,
-                content: content,
+                content: processedContent,
                 folder: selectedFolder,
                 isFavorite: this.currentNote ? this.currentNote.isFavorite : false
             };
 
-            const isNewNote = this.currentNote && this.currentNote._id.startsWith('temp-');
+            const url = this.currentNote
+                ? `${this.baseURL}/api/v1/notes/${this.currentNote._id}`
+                : `${this.baseURL}/api/v1/notes`;
 
-            const url = isNewNote
-                ? `${this.baseURL}/api/v1/notes`
-                : `${this.baseURL}/api/v1/notes/${this.currentNote._id}`;
-
-            const method = isNewNote ? 'POST' : 'PUT';
+            const method = this.currentNote ? 'PUT' : 'POST';
 
             const response = await fetch(url, {
                 method,
@@ -984,45 +905,20 @@ class NoteApp {
 
             if (response.ok) {
                 const savedNote = await response.json();
-                console.log(isNewNote ? 'Note created successfully!' : 'Note updated successfully!');
+                console.log(this.currentNote ? 'Note updated successfully!' : 'Note created successfully!');
 
-                if (isNewNote) {
-                    // For new notes, refresh the notes list and select the new note
-                    await this.loadNotes();
-                    this.selectNote(savedNote._id);
-                    this.updateCounts();
-                    // Exit edit mode and restore button label
-                    this.isEditing = false;
-                    const editNoteBtn = document.getElementById('editNoteBtn');
-                    if (editNoteBtn) {
-                        editNoteBtn.innerHTML = '<i class="fas fa-edit"></i> Edit';
-                        editNoteBtn.classList.remove('btn-primary');
-                        editNoteBtn.classList.add('btn-secondary');
-                    }
-                } else {
-                    // Update the existing note in the array
-                    const index = this.notes.findIndex(n => n._id === this.currentNote._id);
-                    if (index !== -1) {
-                        this.notes[index] = savedNote;
-                    }
+                // Update current note with saved data
+                this.currentNote = savedNote;
+                this.isEditing = false;
 
-                    // Update current note with saved data
-                    this.currentNote = savedNote;
-                    this.isEditing = false;
+                // Reload notes to update the list
+                await this.loadNotes();
+                this.loadFolders();
+                this.updateCounts();
 
-                    // Update UI immediately
-                    this.renderNotes();
-                    this.updateCounts();
-                    this.displayNote();
-                    this.updateContentActions();
-                    // Restore button label
-                    const editNoteBtn = document.getElementById('editNoteBtn');
-                    if (editNoteBtn) {
-                        editNoteBtn.innerHTML = '<i class="fas fa-edit"></i> Edit';
-                        editNoteBtn.classList.remove('btn-primary');
-                        editNoteBtn.classList.add('btn-secondary');
-                    }
-                }
+                // Update display
+                this.displayNote();
+                this.updateContentActions();
             } else {
                 throw new Error('Failed to save note');
             }
@@ -1073,6 +969,8 @@ class NoteApp {
         }
     }
 
+    // toggleFavorite method removed - favorites functionality disabled
+
     toggleTheme() {
         const currentTheme = document.documentElement.getAttribute('data-theme');
         const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
@@ -1080,12 +978,11 @@ class NoteApp {
         document.documentElement.setAttribute('data-theme', newTheme);
         localStorage.setItem('theme', newTheme);
 
-        // Update theme toggle text
         const themeToggleBtn = document.getElementById('themeToggleBtn');
         if (themeToggleBtn) {
-            const textSpan = themeToggleBtn.querySelector('span');
-            if (textSpan) {
-                textSpan.textContent = newTheme === 'dark' ? 'Light Mode' : 'Dark Mode';
+            const icon = themeToggleBtn.querySelector('i');
+            if (icon) {
+                icon.className = newTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
             }
         }
     }
@@ -1106,6 +1003,13 @@ class NoteApp {
         this.debounceTimer = setTimeout(func, wait);
     }
 
+    // showNotification method removed - notifications disabled
+
+    // Tag Management Methods - REMOVED (replaced with new system)
+    // addTag(), removeTag(), getCurrentTags(), renderCurrentTags() methods removed
+
+
+
     cancelEdit() {
         if (!this.isEditing) return;
 
@@ -1122,12 +1026,6 @@ class NoteApp {
 
         // Reset current note folder
         this.currentNoteFolder = null;
-
-        // Update edit button
-        const editNoteBtn = document.getElementById('editNoteBtn');
-        editNoteBtn.innerHTML = '<i class="fas fa-edit"></i> Edit';
-        editNoteBtn.classList.remove('btn-primary');
-        editNoteBtn.classList.add('btn-secondary');
 
         console.log('Edit cancelled');
     }
@@ -1176,7 +1074,7 @@ class NoteApp {
             console.log('Folder updated');
         } else {
             // For new notes being created, just show folder selected message
-            const selectedFolderName = folderSelect.value ?
+            const selectedFolderName = folderSelect.value ? 
                 folderSelect.options[folderSelect.selectedIndex].text : 'No folder';
             console.log(`Folder selected: ${selectedFolderName}`);
         }
@@ -1212,16 +1110,8 @@ class NoteApp {
                 isFavorite: this.currentNote.isFavorite
             };
 
-            const isNewNote = this.currentNote._id.startsWith('temp-');
-
-            const url = isNewNote
-                ? `${this.baseURL}/api/v1/notes`
-                : `${this.baseURL}/api/v1/notes/${this.currentNote._id}`;
-
-            const method = isNewNote ? 'POST' : 'PUT';
-
-            const response = await fetch(url, {
-                method,
+            const response = await fetch(`${this.baseURL}/api/v1/notes/${this.currentNote._id}`, {
+                method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${Auth.getToken()}`
@@ -1231,27 +1121,16 @@ class NoteApp {
 
             if (response.ok) {
                 const savedNote = await response.json();
+                this.currentNote = savedNote;
 
-                if (isNewNote) {
-                    // For new notes, refresh the notes list and select the new note
-                    await this.loadNotes();
-                    this.selectNote(savedNote._id);
-                    this.updateCounts();
-                } else {
-                    // Update the existing note in the array
-                    const index = this.notes.findIndex(n => n._id === this.currentNote._id);
-                    if (index !== -1) {
-                        this.notes[index] = savedNote;
-                    }
+                // Reload notes to update the list
+                await this.loadNotes();
+                this.loadFolders();
+                this.updateCounts();
 
-                    this.currentNote = savedNote;
-
-                    // Update UI immediately
-                    this.renderNotes();
-                    this.updateCounts();
-                    this.displayNote();
-                    this.updateContentActions();
-                }
+                // Update display
+                this.displayNote();
+                this.updateContentActions();
             } else {
                 throw new Error('Failed to save note');
             }
@@ -1264,10 +1143,10 @@ class NoteApp {
     // Mobile Navigation Methods
     openMobileSidebar() {
         if (!this.isMobile) return;
-
+        
         const sidebar = document.querySelector('.sidebar');
         const overlay = document.getElementById('sidebarOverlay');
-
+        
         if (sidebar && overlay) {
             sidebar.classList.add('open');
             overlay.classList.add('open');
@@ -1278,7 +1157,7 @@ class NoteApp {
     closeMobileSidebar() {
         const sidebar = document.querySelector('.sidebar');
         const overlay = document.getElementById('sidebarOverlay');
-
+        
         if (sidebar && overlay) {
             sidebar.classList.remove('open');
             overlay.classList.remove('open');
@@ -1288,7 +1167,7 @@ class NoteApp {
 
     openMobileNote() {
         if (!this.isMobile) return;
-
+        
         const contentArea = document.querySelector('.content-area');
         if (contentArea) {
             contentArea.classList.add('open');
@@ -1312,6 +1191,71 @@ class NoteApp {
             document.body.style.overflow = '';
         }
     }
+
+    onEditorClosed() {
+        // Called when the full-screen editor is closed
+        this.isEditing = false;
+        this.updateContentActions();
+        
+        // Refresh the current note display if we have one
+        if (this.currentNote) {
+            this.displayNote();
+        } else {
+            // Show placeholder if no note is selected
+            document.getElementById('contentPlaceholder').style.display = 'flex';
+            document.getElementById('noteContent').style.display = 'none';
+        }
+    }
+
+    openFullScreenEditor() {
+        if (window.markdownEditor) {
+            window.markdownEditor.openEditor(this.currentNote);
+        }
+    }
+
+    setupSwipeGestures() {
+        let touchStartX = 0;
+        let touchStartY = 0;
+
+        document.addEventListener('touchstart', (e) => {
+            touchStartX = e.changedTouches[0].screenX;
+            touchStartY = e.changedTouches[0].screenY;
+        }, { passive: true });
+
+        document.addEventListener('touchend', (e) => {
+            const touchEndX = e.changedTouches[0].screenX;
+            const touchEndY = e.changedTouches[0].screenY;
+            this.handleSwipe(touchStartX, touchStartY, touchEndX, touchEndY);
+        }, { passive: true });
+    }
+
+    handleSwipe(startX, startY, endX, endY) {
+        const deltaX = endX - startX;
+        const deltaY = endY - startY;
+        const minSwipeDistance = 50;
+        const maxVerticalSwipe = 30; // Maximum vertical movement to consider it a horizontal swipe
+
+        // Only handle horizontal swipes
+        if (Math.abs(deltaY) > maxVerticalSwipe) return;
+
+        const sidebar = document.querySelector('.sidebar');
+        const contentArea = document.querySelector('.content-area');
+
+        // Swipe right to open sidebar (from left edge)
+        if (deltaX > minSwipeDistance && startX < 50 && sidebar && !sidebar.classList.contains('open')) {
+            this.openMobileSidebar();
+        }
+        // Swipe left to close sidebar
+        else if (deltaX < -minSwipeDistance && sidebar && sidebar.classList.contains('open')) {
+            this.closeMobileSidebar();
+        }
+        // Swipe right to close content area (go back to notes)
+        else if (deltaX > minSwipeDistance && contentArea && contentArea.classList.contains('open')) {
+            this.closeMobileNote();
+        }
+    }
+
+
 }
 
 // Initialize the application

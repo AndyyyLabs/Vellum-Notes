@@ -8,8 +8,6 @@ class Auth {
     init() {
         this.setupEventListeners();
         this.checkAuthStatus();
-        // Check token expiry every minute
-        setInterval(() => this.checkTokenExpiry(), 60000);
     }
 
     setupEventListeners() {
@@ -36,7 +34,7 @@ class Auth {
         // Remove active class from all tabs and forms
         document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
         document.querySelectorAll('.form-content').forEach(form => form.classList.remove('active'));
-
+        
         // Add active class to selected tab and form
         document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
         document.getElementById(`${tabName}Form`).classList.add('active');
@@ -44,7 +42,7 @@ class Auth {
 
     async handleLogin(e) {
         e.preventDefault();
-
+        
         const formData = new FormData(e.target);
         const email = formData.get('email');
         const password = formData.get('password');
@@ -68,11 +66,6 @@ class Auth {
 
             if (response.ok) {
                 localStorage.setItem('token', data.token);
-                // Store token expiry time
-                if (data.expiresIn) {
-                    const expiryTime = Date.now() + (data.expiresIn * 1000);
-                    localStorage.setItem('tokenExpiry', expiryTime.toString());
-                }
                 // Store user info for the app to use
                 if (data.user) {
                     localStorage.setItem('user', JSON.stringify(data.user));
@@ -89,7 +82,7 @@ class Auth {
 
     async handleRegister(e) {
         e.preventDefault();
-
+        
         const formData = new FormData(e.target);
         const name = formData.get('name');
         const email = formData.get('email');
@@ -119,19 +112,14 @@ class Auth {
 
             if (response.ok) {
                 localStorage.setItem('token', data.token);
-                // Store token expiry time
-                if (data.expiresIn) {
-                    const expiryTime = Date.now() + (data.expiresIn * 1000);
-                    localStorage.setItem('tokenExpiry', expiryTime.toString());
-                }
                 // Store user info for the app to use
                 if (data.user) {
                     localStorage.setItem('user', JSON.stringify(data.user));
                 }
-
+                
                 // Create template note for new user
                 await this.createTemplateNote(data.token);
-
+                
                 // Redirect immediately without notification
                 window.location.href = '/';
             } else {
@@ -157,59 +145,14 @@ class Auth {
         }
     }
 
-    checkTokenExpiry() {
-        const token = localStorage.getItem('token');
-        const tokenExpiry = localStorage.getItem('tokenExpiry');
-
-        if (token && tokenExpiry) {
-            const now = Date.now();
-            const expiryTime = parseInt(tokenExpiry);
-
-            if (now >= expiryTime) {
-                // Token has expired, redirect to login
-                this.handleTokenExpiry();
-            }
-        }
-    }
-
-    handleTokenExpiry() {
-        // Clear expired token and user data
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        localStorage.removeItem('tokenExpiry');
-
-        // Show notification if not already on login page
-        if (window.location.pathname !== '/login') {
-            // You can add a toast notification here if you have a notification system
-            console.warn('Your session has expired. Please log in again.');
-            window.location.href = '/login';
-        }
-    }
-
     static logout() {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
-        localStorage.removeItem('tokenExpiry');
         window.location.href = '/login';
     }
 
     static getToken() {
-        const token = localStorage.getItem('token');
-        const tokenExpiry = localStorage.getItem('tokenExpiry');
-
-        if (token && tokenExpiry) {
-            const now = Date.now();
-            const expiryTime = parseInt(tokenExpiry);
-
-            if (now >= expiryTime) {
-                // Token has expired, redirect to login
-                const auth = new Auth();
-                auth.handleTokenExpiry();
-                return null;
-            }
-        }
-
-        return token;
+        return localStorage.getItem('token');
     }
 
     static getUser() {
@@ -218,8 +161,7 @@ class Auth {
     }
 
     static isAuthenticated() {
-        const token = Auth.getToken();
-        return !!token;
+        return !!localStorage.getItem('token');
     }
 }
 

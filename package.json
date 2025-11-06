@@ -1,7 +1,7 @@
 {
-  "name": "Vellum-Notes",
-  "version": "0.5.0",
-  "description": "Vellum is a full stack note-taking app that allows you to take notes, create folders, and more.",
+  "name": "Vellum",
+  "version": "0.1.0",
+  "description": "Full Stack Note-Taking App in markdown format",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
@@ -12,10 +12,10 @@
   "dependencies": {
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",
-    "dotenv": "^17.2.1",
-    "express": "^4.21.2",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.17.0"
+    "mongoose": "^8.19.3"
   },
   "devDependencies": {
     "eslint": "^8.0.0",
